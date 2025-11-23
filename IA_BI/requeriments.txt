@@ -1,8 +1,0 @@
-flask
-flask-cors
-pandas
-pyarrow
-duckdb
-gpt4all
-openpyxl
-numpy

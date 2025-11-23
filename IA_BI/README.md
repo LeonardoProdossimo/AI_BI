@@ -18,8 +18,6 @@ Sistema avançado de consulta em linguagem natural que converte perguntas em por
 - [API Endpoints](#-api-endpoints)
 - [Front-end](#-front-end)
 - [Troubleshooting](#-troubleshooting)
-- [Contribuindo](#-contribuindo)
-- [Licença](#-licença)
 
 ## 🎯 Sobre o Projeto
 
@@ -292,19 +290,10 @@ O front-end foi desenvolvido com foco em:
 - O modelo LLM pode ser pesado na primeira execução
 - Considere usar um modelo menor se o hardware for limitado
 - Para grandes volumes de dados, considere usar formato Parquet
-
-## 🤝 Contribuindo
-
-Contribuições são bem-vindas! Para contribuir:
-
-1. Faça um fork do projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
-3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
-4. Push para a branch (`git push origin feature/AmazingFeature`)
-5. Abra um Pull Request
    
 ---
 
 **Nota**: Este projeto utiliza modelos de IA local e não requer conexão com a internet após a instalação inicial dos componentes.
+
 
 

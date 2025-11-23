@@ -48,7 +48,6 @@ O **NLQ (Natural Language Query)** é uma solução completa que permite realiza
 - Exibição do SQL gerado com opção de cópia
 - Feedback visual durante processamento
 - Tratamento de erros amigável
-- Design responsivo (mobile e desktop)
 
 ## 🛠 Tecnologias Utilizadas
 
@@ -303,16 +302,9 @@ Contribuições são bem-vindas! Para contribuir:
 3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
 4. Push para a branch (`git push origin feature/AmazingFeature`)
 5. Abra um Pull Request
-
-## 📝 Licença
-
-Este projeto está sob a licença MIT. Veja o arquivo `LICENSE` para mais detalhes.
-
-## 👨‍💻 Autor
-
-Desenvolvido como parte do projeto de Business Intelligence - Período 6.
-
+   
 ---
 
 **Nota**: Este projeto utiliza modelos de IA local e não requer conexão com a internet após a instalação inicial dos componentes.
+
 

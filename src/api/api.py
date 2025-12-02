@@ -1,106 +1,127 @@
-# api.py
 import os
-from flask import Flask, request, jsonify, send_from_directory, send_file
-from nlq_engine import NLQEngine
-
-# Tentar importar flask-cors (opcional)
-try:
-    from flask_cors import CORS
-    CORS_AVAILABLE = True
-except ImportError:
-    CORS_AVAILABLE = False
-
-# Configurar caminho dos arquivos estáticos
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-STATIC_DIR = os.path.join(os.path.dirname(BASE_DIR), 'static')
-
-app = Flask(__name__, static_folder=STATIC_DIR, static_url_path='/static')
-
-# Permitir CORS para desenvolvimento (se disponível)
-if CORS_AVAILABLE:
-    CORS(app)
-
-engine = NLQEngine()
-
+import sys
+from flask import Flask, request, jsonify, send_file
 
 # ============================================================
-# ROTA PRINCIPAL - SERVE O FRONT-END
+# 1. CONFIGURAÇÃO INTELIGENTE DE CAMINHOS
+# ============================================================
+
+# Caminho do arquivo atual (api.py)
+CURRENT_FILE = os.path.abspath(__file__)
+CURRENT_DIR = os.path.dirname(CURRENT_FILE)
+
+# 1.1 Tentar encontrar a pasta 'static' subindo níveis
+# (Procura em ./static, ../static, ../../static)
+root_dir = CURRENT_DIR
+static_dir = None
+
+for _ in range(3): # Tenta subir até 3 níveis
+    check_path = os.path.join(root_dir, 'static')
+    if os.path.exists(check_path):
+        static_dir = check_path
+        break
+    root_dir = os.path.dirname(root_dir)
+
+if not static_dir:
+    # Fallback: cria um caminho padrão na raiz do projeto assumida
+    static_dir = os.path.join(os.path.dirname(os.path.dirname(CURRENT_DIR)), 'static')
+    print(f">>> AVISO: Pasta 'static' não encontrada automaticamente. Usando fallback: {static_dir}")
+else:
+    print(f">>> Pasta 'static' encontrada em: {static_dir}")
+
+# 1.2 Configurar Python Path para achar o nlq_engine.py
+# Se o api.py está em src/api/, e o engine em src/, precisamos adicionar o pai ao path
+sys.path.append(CURRENT_DIR) # Adiciona pasta atual
+sys.path.append(os.path.dirname(CURRENT_DIR)) # Adiciona pasta pai (src)
+
+try:
+    from nlq_engine import NLQEngine
+except ImportError:
+    # Tenta subir mais um nível caso a estrutura seja diferente
+    sys.path.append(os.path.dirname(os.path.dirname(CURRENT_DIR)))
+    try:
+        from nlq_engine import NLQEngine
+    except ImportError as e:
+        print(">>> ERRO CRÍTICO: Não foi possível encontrar 'nlq_engine.py'.")
+        print(f">>> Verifique se o arquivo está na pasta 'src'. Erro: {e}")
+        sys.exit(1)
+
+# ============================================================
+# 2. INICIALIZAÇÃO FLASK
+# ============================================================
+
+app = Flask(__name__, static_folder=static_dir, static_url_path='/static')
+
+print(f">>> Inicializando Engine IA (Isso pode demorar alguns segundos)...")
+
+# Carrega o modelo apenas uma vez na inicialização
+try:
+    engine = NLQEngine()
+except Exception as e:
+    print(f">>> ERRO ao carregar Engine: {e}")
+    sys.exit(1)
+
+# ============================================================
+# 3. ROTAS
 # ============================================================
 
 @app.route("/")
 def index():
-    return send_file(os.path.join(STATIC_DIR, 'index.html'))
-
-
-# ============================================================
-# API CHECK
-# ============================================================
-
-@app.route("/api", methods=["GET"])
-def api():
-    return jsonify({"status": "ok", "mensagem": "API funcionando"})
-
-
-# ============================================================
-# NLQ → SQL → RESULTADO
-# ============================================================
+    # Serve o arquivo HTML principal
+    return send_file(os.path.join(static_dir, 'index.html'))
 
 @app.route("/nlq", methods=["POST"])
 def nlq():
     try:
-        import time
-        inicio = time.time()
-        
         dados = request.get_json()
-
-        if not dados or "pergunta" not in dados:
-            return jsonify({"erro": "Campo 'pergunta' é obrigatório"}), 400
-
-        pergunta = dados["pergunta"].strip()
+        pergunta = dados.get("pergunta", "").strip()
         
         if not pergunta:
-            return jsonify({"erro": "A pergunta não pode estar vazia"}), 400
+            return jsonify({"erro": "Pergunta vazia"}), 400
 
-        print(f"\n{'='*60}")
-        print(f">>> NOVA REQUISIÇÃO - {time.strftime('%H:%M:%S')}")
-        print(f">>> Pergunta: {pergunta}")
-        print(f"{'='*60}\n")
+        print(f"\n>>> [API] Nova pergunta: {pergunta}")
         
+        # Chama a engine para processar
+        # O engine já cuida do Prompt -> SQL -> Pandas -> JSON
         resposta = engine.perguntar(pergunta)
-        
-        tempo_total = time.time() - inicio
-        print(f"\n{'='*60}")
-        print(f">>> Processamento concluído em {tempo_total:.2f} segundos")
-        print(f">>> Resposta: {resposta.get('sql', 'N/A')[:100]}...")
-        print(f"{'='*60}\n")
         
         return jsonify(resposta)
     
     except Exception as e:
-        print(f">>> ERRO CRÍTICO ao processar pergunta: {str(e)}")
+        print(f">>> Erro API: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({"erro": f"Erro ao processar pergunta: {str(e)}"}), 500
-
-
-# ============================================================
-# EXECUTAR SQL DIRETO
-# ============================================================
+        return jsonify({"erro": f"Erro interno: {str(e)}"}), 500
 
 @app.route("/sql", methods=["POST"])
 def sql():
-    dados = request.get_json()
+    # Rota extra caso queira executar SQL direto (opcional)
+    try:
+        dados = request.get_json()
+        query = dados.get("sql", "").strip()
+        if not query:
+            return jsonify({"erro": "SQL vazio"}), 400
+            
+        resultado = engine.con.execute(query).fetchdf().to_dict(orient="records")
+        return jsonify({"sql": query, "dados": resultado})
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
 
-    if not dados or "sql" not in dados:
-        return jsonify({"erro": "Campo 'sql' é obrigatório"}), 400
-
-    resposta = engine.executar(dados["sql"])
-    return jsonify(resposta)
-
+# No app.py, adicione esta rota:
+@app.route('/api', methods=['GET'])
+def health_check():
+    return jsonify({'status': 'ok', 'message': 'API Online'})
 
 # ============================================================
-# INICIAR SERVIDOR
+# 4. START
 # ============================================================
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    print("\n" + "="*50)
+    print(f">>> SERVIDOR ONLINE!")
+    print(f">>> Acesse: http://localhost:5000")
+    print("="*50 + "\n")
+    
+    # use_reloader=False é CRITICO para não carregar o modelo de IA duas vezes
+    # host='0.0.0.0' permite acesso via rede local
+    app.run(debug=True, host="0.0.0.0", port=5000, use_reloader=False)
